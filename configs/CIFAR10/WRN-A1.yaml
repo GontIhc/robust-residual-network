@@ -1,7 +1,7 @@
 num_classes: 10
 epochs: 100
 grad_clip: 5.0
-log_frequency: 100
+log_frequency: 10
 model:
   name: PreActResNet
   channel_configs:  # [20, 20, 8]
@@ -46,8 +46,8 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 128
-  eval_batch_size: 128
+  train_batch_size: 256
+  eval_batch_size: 256
   num_of_workers: 8
   dataset_type: CIFAR10
   data_path: /data/huangshihua/CIFAR10

@@ -79,6 +79,7 @@ def log_display(epoch, global_step, time_elapse, **kwargs):
         else:
             display += '\t' + str(key) + '=%.4f' % value
     display += '\ttime=%.2fit/s' % (1. / time_elapse)
+    display += '\tall_time=%.2fs' % time_elapse
     return display
 
 

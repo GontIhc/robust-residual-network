@@ -11,6 +11,7 @@ from torch.autograd import Variable
 from torchprofile import profile_macs
 import random
 
+# apex模块和类通常用于深度学习中的混合精度训练和分布式训练
 try:
     from apex import amp
     from apex.parallel import DistributedDataParallel as ApexDDP
@@ -26,124 +27,153 @@ from core.dist_engine import Evaluator, Trainer
 from auto_attack.autoattack import AutoAttack
 from core import util, misc
 
-parser = argparse.ArgumentParser(description='RobustArc')
-parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--version', type=str, default="arch_001")
-parser.add_argument('--fix_seed', action='store_true', default=False)
-parser.add_argument("--stop_epoch", type=int, default=None)
-parser.add_argument("--warmup_steps", type=int, default=0)
-parser.add_argument('--exp_name', type=str, default="new_ablation/more_depths/")
-parser.add_argument('--config_path', type=str, default='configs')
-parser.add_argument('--load_model', action='store_true', default=False)
-parser.add_argument('--load_best_model', action='store_true', default=False)
-parser.add_argument('--data_parallel', action='store_true', default=False)
-parser.add_argument('--train', action='store_true', default=False)
-parser.add_argument('--attack_choice', default='PGD', choices=['PGD', 'AA', 'GAMA', 'CW', 'none', 'MI-FGSM', "TI-FGSM"])
-parser.add_argument('--epsilon', default=8, type=float, help='perturbation')
-parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')
-parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')
-parser.add_argument('--train_eval_epoch', default=0.5, type=float, help='PGD Eval in training after this epoch')
+# 捕捉命令行参数
+def parse_args():
+    parser = argparse.ArgumentParser(description='RobustArc')
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--version', type=str, default="arch_001")
+    parser.add_argument('--fix_seed', action='store_true', default=False)
+    parser.add_argument("--stop_epoch", type=int, default=None)
+    parser.add_argument("--warmup_steps", type=int, default=0)
+    parser.add_argument('--exp_name', type=str, default="new_ablation/more_depths/")
+    parser.add_argument('--config_path', type=str, default='configs')
+    parser.add_argument('--load_model', action='store_true', default=False)
+    parser.add_argument('--load_best_model', action='store_true', default=False)
+    parser.add_argument('--data_parallel', action='store_true', default=False)
+    parser.add_argument('--train', action='store_true', default=False)
+    parser.add_argument('--attack_choice', default='PGD', choices=['PGD', 'AA', 'GAMA', 'CW', 'none', 'MI-FGSM', "TI-FGSM"])
+    parser.add_argument('--epsilon', default=8, type=float, help='perturbation')
+    parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')
+    parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')
+    parser.add_argument('--train_eval_epoch', default=0.5, type=float, help='PGD Eval in training after this epoch')
 
-# for distribute learning
-parser.add_argument('--apex-amp', action='store_true', default=False, help='Use NVIDIA Apex AMP mixed precision')
-parser.add_argument('--native-amp', action='store_true', default=False, help='Use Native Torch AMP mixed precision')
+    # for distribute learning 为了分布式训练
+    parser.add_argument('--apex-amp', action='store_true', default=False, help='Use NVIDIA Apex AMP mixed precision')
+    parser.add_argument('--native-amp', action='store_true', default=False, help='Use Native Torch AMP mixed precision')
 
-# distributed training parameters
-parser.add_argument('--world_size', default=1, type=int,
-                    help='number of distributed processes')
-parser.add_argument('--local_rank', default=-1, type=int)
-parser.add_argument('--dist_on_itp', action='store_true')
-parser.add_argument('--dist_url', default='env://',
-                    help='url used to set up distributed training')
+    # distributed training parameters 分布式训练参数
+    parser.add_argument('--world_size', default=1, type=int,
+                        help='number of distributed processes')
+    parser.add_argument('--local_rank', default=-1, type=int)
+    parser.add_argument('--dist_on_itp', action='store_true')
+    parser.add_argument('--dist_url', default='env://',
+                        help='url used to set up distributed training')
 
-args = parser.parse_args()
-if args.epsilon > 1:
-    args.epsilon = args.epsilon / 255
-    args.step_size = args.step_size / 255
+    # 解析命令行
+    global args
+    args = parser.parse_args()
 
-device = torch.device('cuda')
-misc.init_distributed_mode(args)
-if not args.fix_seed:
-    args.seed = random.randint(0, 1000)
-# fix the seed for reproducibility
-args.seed = args.seed + misc.get_rank()
-torch.manual_seed(args.seed)
-np.random.seed(args.seed)
+    if args.epsilon > 1:
+        args.epsilon = args.epsilon / 255
+        args.step_size = args.step_size / 255
 
-exp_path = args.exp_name
-log_file_path = os.path.join(exp_path, args.version)
-checkpoint_path = "{}/checkpoints".format(exp_path)
-print(log_file_path, checkpoint_path)
-search_results_checkpoint_file_name = None
+    global device
+    device = torch.device('cuda')
 
-checkpoint_path_file = os.path.join(checkpoint_path, args.version)
-if misc.is_main_process():
-    if not os.path.isdir(exp_path):
-        os.makedirs(exp_path, exist_ok=True)
-    if not os.path.isdir(checkpoint_path):
-        os.makedirs(checkpoint_path, exist_ok=True)
+    # 初始化分布式参数
+    misc.init_distributed_mode(args)
 
-if not args.train:
-    logger = util.setup_logger(name=args.version,
-                               log_file=log_file_path + '_eval_at-{}-{}steps'.format(args.attack_choice, args.num_steps) + ".log")
-else:
-    logger = util.setup_logger(name=args.version, log_file=log_file_path + ".log")
+    # 随机种子
+    if not args.fix_seed:
+        args.seed = random.randint(0, 1000)
+    # fix the seed for reproducibility
+    args.seed = args.seed + misc.get_rank()
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
-config_file = os.path.join(args.config_path, args.version) + '.yaml'
-config = mlconfig.load(config_file)
-if misc.is_main_process():
-    shutil.copyfile(config_file, os.path.join(exp_path, args.version + '.yaml'))
+    # 初始化存放训练数据的文件夹和数据
+    exp_path = args.exp_name
+    log_file_path = os.path.join(exp_path, args.version)
+    checkpoint_path = "{}/checkpoints".format(exp_path)
+    print(log_file_path, checkpoint_path)
+    search_results_checkpoint_file_name = None
 
-# resolve AMP arguments based on PyTorch / Apex availability
-use_amp = None
-if args.apex_amp and has_apex:
-    use_amp = 'apex'
-elif args.native_amp:
-    use_amp = 'native'
-elif args.apex_amp or args.native_amp:
-    print("Neither APEX or native Torch AMP is available, using float32. Install NVIDA apex or upgrade to PyTorch 1.6")
+    global checkpoint_path_file
+    checkpoint_path_file = os.path.join(checkpoint_path, args.version)
+    if misc.is_main_process():
+        # if not os.path.isdir(exp_path):
+        #     os.makedirs(exp_path, exist_ok=True)
+        if not os.path.isdir(log_file_path):
+            os.makedirs(log_file_path, exist_ok=True)
+        if not os.path.isdir(checkpoint_path):
+            os.makedirs(checkpoint_path, exist_ok=True)
+    global logger
+    if not args.train:
+        logger = util.setup_logger(name=args.version,
+                                   log_file=log_file_path + '_eval_at-{}-{}steps'.format(args.attack_choice, args.num_steps) + ".log")
+    else:
+        logger = util.setup_logger(name=args.version, log_file=log_file_path + ".log")
 
-torch.backends.cudnn.enabled = True
-torch.backends.cudnn.benchmark = True
-device_list = [torch.cuda.get_device_name(i) for i in range(0, torch.cuda.device_count())]
-if misc.is_main_process():
-    logger.info(args, args.seed)
-    logger.info("GPU List: %s" % (device_list))
-if args.stop_epoch == None:
-    args.stop_epoch = config.epochs
-if config.epochs < 100:  # at least training for 100 epochs
-    config.epochs = 100
-if hasattr(config, 'ema'):
-    args.ema, args.tau, args.static_decay = config.ema, config.tau, config.static_decay
-    logger.info("   ### EMA is using for improving the performance ### ")
-else:
-    args.ema, args.tau, args.static_decay = False, 0, False
-if misc.is_main_process():
-    logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
-    logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
-    logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
+    config_file = os.path.join(args.config_path, args.version) + '.yaml'
+    # config是yaml文件里存储的训练参数
+    global config
+    config = mlconfig.load(config_file)
+    if misc.is_main_process():
+        shutil.copyfile(config_file, os.path.join(exp_path, args.version + '.yaml'))  # 标准库用于复制文件的方法，从前者复制到后者
 
-num_tasks = misc.get_world_size()
-global_rank = misc.get_rank()
+    # resolve AMP arguments based on PyTorch / Apex availability
+    # 根据用户的命令行参数和系统中的库的可用性来确定是否启用混合精度训练，并相应地设置 use_amp 的值
+    # apex是A PyTorch Extension(Apex)，nvidia提供的快速开启混合精度训练，这能提高训练速度
+    global use_amp
+    use_amp = None
+    if args.apex_amp and has_apex:
+        use_amp = 'apex'
+    elif args.native_amp:
+        use_amp = 'native'
+    elif args.apex_amp or args.native_amp:
+        print("Neither APEX or native Torch AMP is available, using float32. Install NVIDA apex or upgrade to PyTorch 1.6")
 
-datasets = config.dataset().getDataLoader()
-dataset_train, dataset_test = datasets['train_set'], datasets['test_set']
-train_bs, test_bs, num_workers = datasets['train_batch_size'], datasets['test_batch_size'], datasets['num_workers']
-train_bs_per, test_bs_per = train_bs // misc.get_world_size(), test_bs // misc.get_world_size()
-sampler_train = torch.utils.data.DistributedSampler(dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True)
-sampler_test = torch.utils.data.DistributedSampler(dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)
-data_loader = {}
-data_loader['train_dataset'] = torch.utils.data.DataLoader(dataset=dataset_train,
-                                                           batch_size=train_bs_per, sampler=sampler_train,
-                                                           pin_memory=True,
-                                                           drop_last=True,
-                                                           num_workers=num_workers)
+    # 优化CuDNN库的行为，以优化GPU上的深度学习模型性能
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+    device_list = [torch.cuda.get_device_name(i) for i in range(0, torch.cuda.device_count())] # 获取GPU数量
+    if misc.is_main_process(): # 主进程打印
+        # logger.info(args, args.seed)
+        logger.info(f"Arguments: {args}, Seed: {args.seed}")
 
-data_loader['test_dataset'] = torch.utils.data.DataLoader(dataset=dataset_test,
-                                                          batch_size=test_bs_per, sampler=sampler_test,
-                                                          pin_memory=True,
-                                                          drop_last=False,
-                                                          num_workers=num_workers)
+        logger.info("GPU List: %s" % (device_list))
+    if args.stop_epoch == None:
+        args.stop_epoch = config.epochs
+    if config.epochs < 100:  # at least training for 100 epochs
+        config.epochs = 100
+    if hasattr(config, 'ema'):
+        args.ema, args.tau, args.static_decay = config.ema, config.tau, config.static_decay
+        logger.info("   ### EMA is using for improving the performance ### ")
+    else:
+        args.ema, args.tau, args.static_decay = False, 0, False
+    if misc.is_main_process():
+        # PGD Eval in training after this epoch 即在多少个epoch时使用PGD来评估(0.5)
+
+        logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
+        logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
+        logger.info(" ### Start to evaluate from {} Epoch ### ".format(config.epochs * args.train_eval_epoch))
+
+    num_tasks = misc.get_world_size()  # 获取世界数，为1则为没有进行分布式训练，单机单GPU
+    global_rank = misc.get_rank()  # 用户获取当前进程在分布式训练的排名
+    # 复杂的加载数据集的方法,里面的train_set是原始数据，'test_dataset'是DataLoader
+    datasets = config.dataset().getDataLoader()  # config.dataset()是DatasetGenerator
+    # 这里实际上获取的是原始的读取的数据集，还没有使用DataLoader
+    dataset_train, dataset_test = datasets['train_set'], datasets['test_set'] # 这里实际上获取的是
+    train_bs, test_bs, num_workers = datasets['train_batch_size'], datasets['test_batch_size'], datasets['num_workers']
+
+    # 再次依据分布式GPU划分数据集
+    train_bs_per, test_bs_per = train_bs // misc.get_world_size(), test_bs // misc.get_world_size()
+    # 设置采样器，实际上这个代码在每个进程上都会执行，他会指导DataLoader为不同的GPU生成自己的数据
+    sampler_train = torch.utils.data.DistributedSampler(dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True)
+    sampler_test = torch.utils.data.DistributedSampler(dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)
+    global data_loader
+    data_loader = {}
+    data_loader['train_dataset'] = torch.utils.data.DataLoader(dataset=dataset_train,
+                                                               batch_size=train_bs_per, sampler=sampler_train,
+                                                               pin_memory=True,
+                                                               drop_last=True,
+                                                               num_workers=num_workers)
+
+    data_loader['test_dataset'] = torch.utils.data.DataLoader(dataset=dataset_test,
+                                                              batch_size=test_bs_per, sampler=sampler_test,
+                                                              pin_memory=True,
+                                                              drop_last=True,
+                                                              num_workers=num_workers)
 
 
 def whitebox_eval(data_loader, model, evaluator, log=True, amp_autocast=torch.cuda.amp.autocast, amp_scaler=False):
@@ -267,11 +297,12 @@ def train(starting_epoch, model, genotype, optimizer, scheduler, criterion,
           amp_autocast=torch.cuda.amp.autocast, amp_scaler=False):
     print(model)
     for epoch in range(starting_epoch, config.epochs):
+
+        # 增加数据的随机性，每个epoch的随机采样种子以epoch为数，保证每次epoch的随机性，不设置的话每次epoch都是使用相同的数据顺序
         data_loader['train_dataset'].sampler.set_epoch(epoch)
-        if misc.is_main_process():
-            logger.info("=" * 20 + "Training Epoch %d" % (epoch) + "=" * 20)
+
         adjust_learning_rate(optimizer, epoch)
-        # Train
+        # Train  实际训练阿位置，trainer建立的训练类
         ENV['global_step'] = trainer.train(epoch, model, criterion, optimizer, model_ema=model_ema)
         if args.ema:    # update BN
             update_bn(model_ema, model)
@@ -284,6 +315,8 @@ def train(starting_epoch, model, genotype, optimizer, scheduler, criterion,
         ENV['curren_acc'] = evaluator.acc_meters.avg * 100
 
         is_best = False
+
+        # 到了测试点，开始测试，默认是epochs*0.5
         if epoch >= config.epochs * args.train_eval_epoch and args.train_eval_epoch >= 0:
             # Reset Stats
             trainer._reset_stats()
@@ -392,8 +425,11 @@ def main():
     amp_scaler = (args.apex_amp and has_apex)
     criterion = config.criterion()
 
+    # 训练器和评估器
     trainer = Trainer(criterion, data_loader, logger, config, amp_scaler=amp_scaler, amp_autocast=amp_autocast, args=args)
     evaluator = Evaluator(data_loader, logger, config)
+
+    # 生成一个假数据进行推理来估算浮点计算量
     if hasattr(config.dataset, "input_size"):
         print("   ## FLOPs with input shape {} ##  ".format([1, 3, config.dataset.input_size, config.dataset.input_size]))
         profile_inputs = (torch.randn([1, 3, config.dataset.input_size, config.dataset.input_size]).to(device),)
@@ -405,6 +441,7 @@ def main():
     flops = profile_macs(model, profile_inputs) / 1e6
     starting_epoch = 0
 
+    # 锁定配置对象，使其变为不可变状态
     config.set_immutable()
     if args.local_rank == 0:
         for key in config:
@@ -413,6 +450,7 @@ def main():
         logger.info("flops: %.4fM" % flops)
         logger.info("PyTorch Version: %s" % (torch.__version__))
 
+    # 记录环境的变量
     ENV = {'global_step': 0,
            'best_acc': 0.0,
            'curren_acc': 0.0,
@@ -425,6 +463,7 @@ def main():
            'lip_history': [],
            'genotype_list': []}
 
+    # 可以设置从检查点加载已经训练的模型，比方说从某个点训练断开。可以第二天接着训练
     if args.load_model or args.load_best_model:
         filename = checkpoint_path_file + '_best.pth' if args.load_best_model else checkpoint_path_file + '.pth'
         checkpoint = util.load_model(filename=filename,
@@ -441,7 +480,10 @@ def main():
         trainer.global_step = ENV['global_step']
         if args.local_rank == 0:
             logger.info("File %s loaded!" % (filename))
+
     # adding EMA before DDP
+    # DDP：分布式数据并行
+    # EMA：指数移动平均
     if args.ema:
         model_ema = copy.deepcopy(model)
     else:
@@ -454,12 +496,16 @@ def main():
     else:
         if args.local_rank == 0:
             logger.info("Using native Torch DistributedDataParallel.")
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
-                                                          find_unused_parameters=True, broadcast_buffers=False)
+
+        # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
+        #                                                   find_unused_parameters=True, broadcast_buffers=False)
+        # 修改为单GPU
+        model = model.to('cuda')
         # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], broadcast_buffers=False)
     if args.local_rank == 0:
         logger.info("Starting Epoch: %d" % (starting_epoch))
 
+    print("============================开始训练=======================================")
     if args.train:
         train(starting_epoch, model, genotype, optimizer, None, criterion, trainer, evaluator,
               ENV, data_loader, model_ema=model_ema)
@@ -490,6 +536,7 @@ def main():
 
 
 if __name__ == '__main__':
+    parse_args()
     for arg in vars(args):
         logger.info("%s: %s" % (arg, getattr(args, arg)))
     start = time.time()

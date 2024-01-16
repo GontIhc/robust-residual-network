@@ -49,15 +49,17 @@ class Trainer:
             log_payload = self.train_batch(images, labels, model, optimizer, teacher_model=teacher_model)
             end = time.time()
             time_used = end - start
-            if self.global_step % self.log_frequency == 0:
+            if self.global_step % self.log_frequency == 0:  # 每100个batch打印一下信息
                 display = util.log_display(epoch=epoch,
                                            global_step=self.global_step,
                                            time_elapse=time_used,
                                            **log_payload)
+
+                # 作者写的工具类函数，判断分布式训练中是否是主进程
                 if misc.is_main_process():
                     self.logger.info(display)
             self.global_step += 1
-            if self.args.ema:
+            if self.args.ema:  # 使用指数移动平均来炼丹
                 """
                 Exponential model weight averaging update.
                 """
@@ -92,11 +94,11 @@ class Trainer:
                 with self.amp_autocast():
                     logits, loss, _ = self.criterion(model, images, labels, optimizer)
         else:
-            if isinstance(self.criterion, torch.nn.CrossEntropyLoss):
+            if isinstance(self.criterion, torch.nn.CrossEntropyLoss):  # 交叉熵
                 logits = model(images)
                 loss = self.criterion(logits, labels)
             else:
-                logits, loss, _ = self.criterion(model, images, labels, optimizer)
+                logits, loss, _ = self.criterion(model, images, labels, optimizer)  # 自定义的TradesLoss
 
         if self.amp_scaler:   # amp scale loss, only for apex
             with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -119,15 +121,15 @@ class Trainer:
         optimizer.step()
         if len(labels.shape) > 1:
             labels = labels.argmax(dim=1)
-        acc, acc5 = util.accuracy(logits, labels, topk=(1, 5))
+        acc, acc5 = util.accuracy(logits, labels, topk=(1, 5))  # 精确性/准确性  top-k是计算机视觉中计算准确率的方式，这里计算两个准确率
         self.loss_meters.update(loss.item(), labels.shape[0])
-        self.acc_meters.update(acc.item(), labels.shape[0])
+        self.acc_meters.update(acc.item(), labels.shape[0])  # self.acc_meters = util.AverageMeter()
         self.acc5_meters.update(acc5.item(), labels.shape[0])
 
         payload = {"acc": acc,
-                   "acc_avg": self.acc_meters.avg,
+                   "acc_avg": self.acc_meters.avg,  # 均值
                    "loss": loss,
-                   "loss_avg": self.loss_meters.avg,
+                   "loss_avg": self.loss_meters.avg,  # 均值
                    "lr": optimizer.param_groups[0]['lr'],
                    "|gn|": grad_norm}
         return payload
