@@ -26,6 +26,7 @@ from core import dataset
 from core.dist_engine import Evaluator, Trainer
 from auto_attack.autoattack import AutoAttack
 from core import util, misc
+import gc
 
 # 捕捉命令行参数
 def parse_args():
@@ -54,7 +55,7 @@ def parse_args():
     # distributed training parameters 分布式训练参数
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--local_rank', default=-1, type=int)
+    parser.add_argument('--local-rank', default=-1, type=int)  # 用于分布式训练的参数
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
@@ -70,7 +71,7 @@ def parse_args():
     global device
     device = torch.device('cuda')
 
-    # 初始化分布式参数
+    # 初始化分布式参数，这里设置了DDP的运行参数
     misc.init_distributed_mode(args)
 
     # 随机种子
@@ -444,10 +445,11 @@ def main():
     # 锁定配置对象，使其变为不可变状态
     config.set_immutable()
     if args.local_rank == 0:
+        print("打印配置信息")
         for key in config:
             logger.info("%s: %s" % (key, config[key]))
-        logger.info("param size = %fMB", util.count_parameters_in_MB(model))
-        logger.info("flops: %.4fM" % flops)
+        logger.info("param size = %fMB", util.count_parameters_in_MB(model))  # 模型大小
+        logger.info("flops: %.4fM" % flops)     # 模型计算速度
         logger.info("PyTorch Version: %s" % (torch.__version__))
 
     # 记录环境的变量
@@ -497,10 +499,10 @@ def main():
         if args.local_rank == 0:
             logger.info("Using native Torch DistributedDataParallel.")
 
-        # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
-        #                                                   find_unused_parameters=True, broadcast_buffers=False)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
+                                                          find_unused_parameters=True, broadcast_buffers=False)
         # 修改为单GPU
-        model = model.to('cuda')
+        # model = model.to('cuda')
         # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], broadcast_buffers=False)
     if args.local_rank == 0:
         logger.info("Starting Epoch: %d" % (starting_epoch))
@@ -536,6 +538,8 @@ def main():
 
 
 if __name__ == '__main__':
+    gc.collect()
+    torch.cuda.empty_cache()
     parse_args()
     for arg in vars(args):
         logger.info("%s: %s" % (arg, getattr(args, arg)))

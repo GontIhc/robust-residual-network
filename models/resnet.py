@@ -137,6 +137,7 @@ class NetworkBlock(nn.Module):
         else:
             raise ('Unknown block: %s' % block_type)
 
+        # 制作网络块
         self.layer = self._make_layer(
             block, in_planes, out_planes, nb_layers, stride, kernel_size, activation, normalization,
             cardinality=cardinality, base_width=base_width, scales=scales, se_reduction=se_reduction)
@@ -156,7 +157,7 @@ class NetworkBlock(nn.Module):
             layers.append(block(in_planes, out_planes, i == 0 and stride or 1, kernel_size=kernel_size,
                                 activation=activation, normalization=normalization,
                                 cardinality=cardinality, base_width=base_width,
-                                scales=scales, se_reduction=se_reduction)
+                                scales=scales, se_reduction=se_reduction)  # 第一次使用传入的stride，其他步长为0
                           )
         return nn.Sequential(*layers)
 
@@ -198,7 +199,7 @@ class PreActResNet(nn.Module):
         for i, stride in enumerate(stride_config):
             self.blocks.append(NetworkBlock(nb_layers=depth_configs[i],
                                             in_planes=out_planes,
-                                            out_planes=channel_configs[i + 1],
+                                            out_planes=channel_configs[i + 1],  # channel_configs有四个，第一个是上面普通卷积的输出
                                             stride=stride,
                                             kernel_size=kernel_size_configs[i],
                                             block_type=block_types[i],
