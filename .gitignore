@@ -144,3 +144,4 @@ dmypy.json
 .idea
 
 exp/
+ResNet_Test/
