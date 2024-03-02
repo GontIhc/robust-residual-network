@@ -1,18 +1,18 @@
 num_classes: 10
 epochs: 100
 grad_clip: 5.0
-log_frequency: 100
+log_frequency: 10
 model:
   name: PreActResNet
   channel_configs:  # [20, 20, 8]
-  - 16
-  - 128
-  - 352
-  - 320
+  - 16  # 第一个是普通卷积操作的输出
+  - 80
+  - 224
+  - 192
   depth_configs:
-  - 22
-  - 22
-  - 11
+  - 14
+  - 14
+  - 7
   drop_rate_config:
   - 0.0
   - 0.0
@@ -46,11 +46,11 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 400
-  eval_batch_size: 128
+  train_batch_size: 512
+  eval_batch_size: 512
   num_of_workers: 8
   dataset_type: CIFAR10
-  data_path: /system_maintainer/dataset
+  data_path: /data/huangshihua/CIFAR10
 optimizer:
   name: SGD
   lr: 0.1

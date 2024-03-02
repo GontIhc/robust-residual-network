@@ -46,6 +46,7 @@ class Trainer:
         for i, (images, labels) in enumerate(self.data_loader["train_dataset"]):
             images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
             start = time.time()
+            # 训练一个batch
             log_payload = self.train_batch(images, labels, model, optimizer, teacher_model=teacher_model)
             end = time.time()
             time_used = end - start

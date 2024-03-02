@@ -44,8 +44,8 @@ def parse_args():
     parser.add_argument('--train', action='store_true', default=False)
     parser.add_argument('--attack_choice', default='PGD', choices=['PGD', 'AA', 'GAMA', 'CW', 'none', 'MI-FGSM', "TI-FGSM"])
     parser.add_argument('--epsilon', default=8, type=float, help='perturbation')
-    parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')
-    parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')
+    parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')  # PGD中发现对抗样本的迭代次数
+    parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')   # PGD中的扰动大小
     parser.add_argument('--train_eval_epoch', default=0.5, type=float, help='PGD Eval in training after this epoch')
 
     # for distribute learning 为了分布式训练
@@ -85,12 +85,16 @@ def parse_args():
     # 初始化存放训练数据的文件夹和数据
     exp_path = args.exp_name
     log_file_path = os.path.join(exp_path, args.version)
+    log_file_path = log_file_path.replace('\\', '/')
+    # log_file_path = './exps/CIFAR10/RseNet-50-origin'
     checkpoint_path = "{}/checkpoints".format(exp_path)
     print(log_file_path, checkpoint_path)
     search_results_checkpoint_file_name = None
 
     global checkpoint_path_file
     checkpoint_path_file = os.path.join(checkpoint_path, args.version)
+    checkpoint_path_file = checkpoint_path_file.replace('\\', '/')
+    # checkpoint_path_file = './exps/CIFAR10/RseNet-50-origin'
     if misc.is_main_process():
         # if not os.path.isdir(exp_path):
         #     os.makedirs(exp_path, exist_ok=True)
@@ -101,16 +105,22 @@ def parse_args():
     global logger
     if not args.train:
         logger = util.setup_logger(name=args.version,
-                                   log_file=log_file_path + '_eval_at-{}-{}steps'.format(args.attack_choice, args.num_steps) + ".log")
+                                   log_file=log_file_path + '/' + args.version + '_eval_at-{}-{}steps'.format(args.attack_choice, args.num_steps) + ".log")
     else:
-        logger = util.setup_logger(name=args.version, log_file=log_file_path + ".log")
+        logger = util.setup_logger(name=args.version, log_file=log_file_path + '/' + args.version + ".log")
 
     config_file = os.path.join(args.config_path, args.version) + '.yaml'
+    config_file = config_file.replace('\\', '/')
+    # config_file = './configs/CIFAR10/RseNet-50-origin.yaml'
     # config是yaml文件里存储的训练参数
     global config
     config = mlconfig.load(config_file)
     if misc.is_main_process():
-        shutil.copyfile(config_file, os.path.join(exp_path, args.version + '.yaml'))  # 标准库用于复制文件的方法，从前者复制到后者
+        temp_path = os.path.join(exp_path, args.version + '/' + args.version + '.yaml')
+        temp_path = temp_path.replace('\\', '/')
+        # temp_path = './exps/CIFAR10/RseNet-50-origin.yaml'
+        shutil.copyfile(config_file, temp_path)  # 标准库用于复制文件的方法，从前者复制到后者
+        # shutil.copyfile(config_file, os.path.join(exp_path, args.version + '.yaml'))  # 标准库用于复制文件的方法，从前者复制到后者
 
     # resolve AMP arguments based on PyTorch / Apex availability
     # 根据用户的命令行参数和系统中的库的可用性来确定是否启用混合精度训练，并相应地设置 use_amp 的值
@@ -188,7 +198,7 @@ def whitebox_eval(data_loader, model, evaluator, log=True, amp_autocast=torch.cu
         images, labels = images.to(device), labels.to(device)
         # pgd attack
         images, labels = Variable(images, requires_grad=True), Variable(labels)
-        if args.attack_choice == 'PGD':
+        if args.attack_choice == 'PGD':  # 默认是这个
             rs = evaluator._pgd_whitebox(model, images, labels, random_start=True, epsilon=args.epsilon,
                                          num_steps=args.num_steps, step_size=args.step_size,
                                          amp_autocast=amp_autocast, amp_scaler=amp_scaler)
@@ -317,7 +327,7 @@ def train(starting_epoch, model, genotype, optimizer, scheduler, criterion,
 
         is_best = False
 
-        # 到了测试点，开始测试，默认是epochs*0.5
+        # 到了鲁棒性测试点，开始鲁棒性测试(使用PGD攻击)，默认是epochs*0.5
         if epoch >= config.epochs * args.train_eval_epoch and args.train_eval_epoch >= 0:
             # Reset Stats
             trainer._reset_stats()
@@ -352,6 +362,13 @@ def train(starting_epoch, model, genotype, optimizer, scheduler, criterion,
                             genotype=genotype,
                             save_best=is_best,
                             filename=filename)
+            # 保存为ONNX的模型，方便查看
+            # def forward_on_device(*inputs):
+            #     return model(*inputs)
+            # dummy_input = torch.randn(1, 3, 32, 32)
+            # filename_onnx = checkpoint_path_file + '.onnx'
+            # torch.onnx.export(forward_on_device, dummy_input, filename_onnx, verbose=True)
+
             logger.info('Model Saved at %s\n', filename)
             if args.ema:        # update the Model_EMA at every epoch for resume training
                 filename = checkpoint_path_file + '_ema.pth'
@@ -507,29 +524,36 @@ def main():
     if args.local_rank == 0:
         logger.info("Starting Epoch: %d" % (starting_epoch))
 
-    print("============================开始训练=======================================")
+
     if args.train:
+        print("============================开始训练=======================================")
         train(starting_epoch, model, genotype, optimizer, None, criterion, trainer, evaluator,
               ENV, data_loader, model_ema=model_ema)
     elif args.attack_choice in ['PGD', 'GAMA', 'CW', "MI-FGSM", "TI-FGSM"]:
+        print("============================开始常规攻击=======================================")
         for param in model.parameters():
             param.requires_grad = False
         model.eval()
         natural_acc, adv_acc, stable_acc, lip = whitebox_eval(data_loader, model, evaluator)
 
     elif args.attack_choice == 'AA':
+        print("============================开始AA攻击=======================================")
         for param in model.parameters():
             param.requires_grad = False
+        # 从测试集中提取数据
         x_test = [x for (x, y) in data_loader['test_dataset']]
         x_test = torch.cat(x_test, dim=0)
         y_test = [y for (x, y) in data_loader['test_dataset']]
         y_test = torch.cat(y_test, dim=0)
         model.eval()
 
+        # 初始化AutoAttack中得各种攻击器
         adversary = AutoAttack(model, norm='Linf', eps=args.epsilon, logger=logger, verbose=True)
         adversary.plus = False
 
         logger.info('=' * 20 + 'AA Attack Eval' + '=' * 20)
+
+        # 开始攻击
         x_adv, robust_accuracy = adversary.run_standard_evaluation(x_test, y_test, bs=config.dataset.eval_batch_size)
         robust_accuracy = robust_accuracy * 100
         logger.info('AA Accuracy: %.2f' % (robust_accuracy))

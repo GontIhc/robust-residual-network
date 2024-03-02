@@ -1,6 +1,6 @@
 import mlconfig
 import torch
-from models.resnet import PreActResNet
+from models.resnet import PreActResNet, ResNet
 from models.robnet import RobNet
 from models.advrush import AdvRush
 
@@ -19,4 +19,6 @@ mlconfig.register(torch.nn.CrossEntropyLoss)
 mlconfig.register(PreActResNet)
 mlconfig.register(RobNet)
 mlconfig.register(AdvRush)
+
+mlconfig.register(ResNet)
 

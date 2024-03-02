@@ -36,7 +36,7 @@ class TradesLoss(nn.Module):
         self.beta = beta
         self.distance = distance
         self.ce = ce
-        self.criterion_kl = nn.KLDivLoss(reduction='sum')
+        self.criterion_kl = nn.KLDivLoss(reduction='sum')  #　KL散度损失
         self.cross_entropy = models.CutMixCrossEntropyLoss() if cutmix else torch.nn.CrossEntropyLoss()
         self.adjust_freeze = adjust_freeze
 

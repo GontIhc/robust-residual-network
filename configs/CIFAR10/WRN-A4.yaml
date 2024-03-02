@@ -46,7 +46,7 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 128
+  train_batch_size: 256
   eval_batch_size: 128
   num_of_workers: 8
   dataset_type: CIFAR10

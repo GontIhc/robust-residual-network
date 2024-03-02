@@ -24,9 +24,9 @@ model:
   - 2
   zero_init_residual: false
   block_types:
-  - basic_block
-  - basic_block
-  - basic_block
+  - robust_res_block
+  - robust_res_block
+  - robust_res_block
   activations:
   - ReLU
   - ReLU
@@ -46,7 +46,7 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 400
+  train_batch_size: 128
   eval_batch_size: 128
   num_of_workers: 8
   dataset_type: CIFAR10

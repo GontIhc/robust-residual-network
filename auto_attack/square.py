@@ -260,7 +260,9 @@ class SquareAttack():
                     margin, loss = self.margin_and_loss(x_new, y_curr)
 
                     # update loss if new loss is better
+
                     idx_improved = (loss < loss_min_curr).float()
+                    idx_improved = idx_improved.to(loss.dtype)
 
                     loss_min[idx_to_fool] = idx_improved * loss + (
                         1. - idx_improved) * loss_min_curr
