@@ -50,7 +50,7 @@ class Trainer:
             log_payload = self.train_batch(images, labels, model, optimizer, teacher_model=teacher_model)
             end = time.time()
             time_used = end - start
-            if self.global_step % self.log_frequency == 0:  # 每100个batch打印一下信息
+            if self.global_step % self.log_frequency == 0:  # 每10个batch打印一下信息
                 display = util.log_display(epoch=epoch,
                                            global_step=self.global_step,
                                            time_elapse=time_used,
@@ -59,7 +59,7 @@ class Trainer:
                 # 作者写的工具类函数，判断分布式训练中是否是主进程
                 if misc.is_main_process():
                     self.logger.info(display)
-            self.global_step += 1
+            self.global_step += 1   # 训练初始化的时候是0,每个 batch + 1
             if self.args.ema:  # 使用指数移动平均来炼丹
                 """
                 Exponential model weight averaging update.

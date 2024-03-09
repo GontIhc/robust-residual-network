@@ -6,6 +6,7 @@ __pycache__/
 .idea
 post_process_checkpoints.py
 ipynb/
+\wandb
 \exps
 #\configs
 #subnets/

@@ -28,6 +28,8 @@ from auto_attack.autoattack import AutoAttack
 from core import util, misc
 import gc
 
+import wandb
+
 # 捕捉命令行参数
 def parse_args():
     parser = argparse.ArgumentParser(description='RobustArc')
@@ -46,7 +48,7 @@ def parse_args():
     parser.add_argument('--epsilon', default=8, type=float, help='perturbation')
     parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')  # PGD中发现对抗样本的迭代次数
     parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')   # PGD中的扰动大小
-    parser.add_argument('--train_eval_epoch', default=0.5, type=float, help='PGD Eval in training after this epoch')
+    parser.add_argument('--train_eval_epoch', default=0.9, type=float, help='PGD Eval in training after this epoch')
 
     # for distribute learning 为了分布式训练
     parser.add_argument('--apex-amp', action='store_true', default=False, help='Use NVIDIA Apex AMP mixed precision')
@@ -320,6 +322,7 @@ def train(starting_epoch, model, genotype, optimizer, scheduler, criterion,
         # Eval
         evaluator.eval(epoch, model, amp_autocast=amp_autocast, amp_scaler=amp_scaler)
         if misc.is_main_process():
+            wandb.log({"acc": evaluator.acc_meters.avg * 100, "loss": evaluator.loss_meters.avg})
             logger.info("=" * 20 + "Eval Epoch %d" % (epoch) + "=" * 20)
             logger.info(('Eval Loss:%.4f\tEval acc: %.2f' % (evaluator.loss_meters.avg, evaluator.acc_meters.avg * 100)))
         ENV['eval_history'].append(evaluator.acc_meters.avg * 100)
@@ -431,7 +434,7 @@ def main():
     else:
         params = model.parameters()
 
-    optimizer = config.optimizer(params)
+    optimizer = config.optimizer(params)    # 优化器
     # setup automatic mixed-precision (AMP) loss scaling and op casting
     if use_amp == 'apex':
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
@@ -446,6 +449,20 @@ def main():
     # 训练器和评估器
     trainer = Trainer(criterion, data_loader, logger, config, amp_scaler=amp_scaler, amp_autocast=amp_autocast, args=args)
     evaluator = Evaluator(data_loader, logger, config)
+
+    # 可视化操作
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="RobustResNet",
+
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": optimizer.param_groups[0]['lr'],
+            "architecture": args.version,
+            "dataset": "CIFAR-10",
+            "epochs": config.epochs,
+        }
+    )
 
     # 生成一个假数据进行推理来估算浮点计算量
     if hasattr(config.dataset, "input_size"):
@@ -466,7 +483,7 @@ def main():
         for key in config:
             logger.info("%s: %s" % (key, config[key]))
         logger.info("param size = %fMB", util.count_parameters_in_MB(model))  # 模型大小
-        logger.info("flops: %.4fM" % flops)     # 模型计算速度
+        logger.info("flops: %.4fM" % flops)     # 模型计算速度* *
         logger.info("PyTorch Version: %s" % (torch.__version__))
 
     # 记录环境的变量
@@ -558,10 +575,15 @@ def main():
         robust_accuracy = robust_accuracy * 100
         logger.info('AA Accuracy: %.2f' % (robust_accuracy))
 
+    wandb.finish()
     return
 
 
 if __name__ == '__main__':
+
+    os.environ["WANDB_API_KEY"] = 'KEY'
+    os.environ["WANDB_MODE"] = "offline"
+
     gc.collect()
     torch.cuda.empty_cache()
     parse_args()
