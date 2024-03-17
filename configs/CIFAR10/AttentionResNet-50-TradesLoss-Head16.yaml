@@ -14,7 +14,7 @@ model:
   resolution:
     - 32
     - 32
-  heads: 8
+  heads: 16
 criterion:
   name: TradesLoss
   epsilon: 0.03137254901960784
@@ -29,10 +29,11 @@ dataset:
   data_path: /data/huangshihua/CIFAR10
 optimizer:
   name: Adam
-  lr: 0.001
+  lr: 0.0001
+
   weight_decay: 0.0002
 #  name: SGD
-#  lr: 0.01
+#  lr: 0.001
 #  weight_decay: 0.0002
 #  momentum: 0.9
 scheduler:

@@ -3,18 +3,13 @@ epochs: 200
 grad_clip: 5.0
 log_frequency: 10
 model:
-  name: ResNet
-  block: Bottleneck
-  num_blocks:
+  name: ResNet_cbam
+  block: Bottleneck_cbam
+  layers:
     - 3
     - 4
     - 6
     - 3
-  mhsa: True
-  resolution:
-    - 32
-    - 32
-  heads: 8
 criterion:
   name: TradesLoss
   epsilon: 0.03137254901960784

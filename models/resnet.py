@@ -326,7 +326,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10, resolution=(32, 32), heads=4, mhsa=False):
+    def __init__(self, block, num_blocks, num_classes=10, resolution=(32, 32), heads1=4, heads2=4, heads3=4, heads4=4, mhsa1=False, mhsa2=False, mhsa3=False, mhsa4=False):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
@@ -345,10 +345,10 @@ class ResNet(nn.Module):
             self.resolution[1] /= 2
 
         self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2, heads=heads, mhsa=mhsa)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1, heads=heads1, mhsa=mhsa1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, heads=heads2, mhsa=mhsa2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, heads=heads3, mhsa=mhsa3)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2, heads=heads4, mhsa=mhsa4)
         self.linear = nn.Linear(512 * block.expansion, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride, heads=4, mhsa=False):

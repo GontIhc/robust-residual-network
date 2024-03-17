@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--epsilon', default=8, type=float, help='perturbation')
     parser.add_argument('--num_steps', default=20, type=int, help='perturb number of steps')  # PGD中发现对抗样本的迭代次数
     parser.add_argument('--step_size', default=0.8, type=float, help='perturb step size')   # PGD中的扰动大小
-    parser.add_argument('--train_eval_epoch', default=0.9, type=float, help='PGD Eval in training after this epoch')
+    parser.add_argument('--train_eval_epoch', default=0.5, type=float, help='PGD Eval in training after this epoch')
 
     # for distribute learning 为了分布式训练
     parser.add_argument('--apex-amp', action='store_true', default=False, help='Use NVIDIA Apex AMP mixed precision')
@@ -82,6 +82,7 @@ def parse_args():
     # fix the seed for reproducibility
     args.seed = args.seed + misc.get_rank()
     torch.manual_seed(args.seed)
+    torch.manual_seed(3407)  # 测试随机种子的效果
     np.random.seed(args.seed)
 
     # 初始化存放训练数据的文件夹和数据
@@ -464,7 +465,7 @@ def main():
         }
     )
 
-    # 生成一个假数据进行推理来估算浮点计算量
+    # 生成一个假数据进行推理来估算浮点计算量\数据量\参数量
     if hasattr(config.dataset, "input_size"):
         print("   ## FLOPs with input shape {} ##  ".format([1, 3, config.dataset.input_size, config.dataset.input_size]))
         profile_inputs = (torch.randn([1, 3, config.dataset.input_size, config.dataset.input_size]).to(device),)

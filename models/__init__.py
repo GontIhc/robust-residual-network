@@ -1,8 +1,10 @@
 import mlconfig
 import torch
 from models.resnet import PreActResNet, ResNet
+from models.resnet_cbam import ResNet_cbam, Bottleneck_cbam
 from models.robnet import RobNet
 from models.advrush import AdvRush
+from models.wide_resnet import Wide_ResNet
 
 # Setup mlconfig
 mlconfig.register(torch.optim.SGD)
@@ -20,5 +22,8 @@ mlconfig.register(PreActResNet)
 mlconfig.register(RobNet)
 mlconfig.register(AdvRush)
 
-mlconfig.register(ResNet)
+mlconfig.register(ResNet)  # 基本的ResNet
+mlconfig.register(Wide_ResNet)  # 基本的WideResNet
+
+mlconfig.register(ResNet_cbam)
 
