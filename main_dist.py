@@ -588,6 +588,8 @@ if __name__ == '__main__':
     gc.collect()
     torch.cuda.empty_cache()
     parse_args()
+    global args
+    global logger
     for arg in vars(args):
         logger.info("%s: %s" % (arg, getattr(args, arg)))
     start = time.time()

@@ -1,5 +1,6 @@
 import mlconfig
 
+from .losses.AT import ATLoss
 from .losses.trades import TradesLoss
 from .losses.madrys import MadrysLoss
 from .losses.mart import MartLoss
@@ -11,4 +12,5 @@ mlconfig.register(TradesLoss)
 mlconfig.register(MadrysLoss)
 mlconfig.register(MartLoss)
 mlconfig.register(DatasetGenerator)
+mlconfig.register(ATLoss)
 

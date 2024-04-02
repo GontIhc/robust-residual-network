@@ -10,6 +10,13 @@ model:
     - 4
     - 6
     - 3
+  activation: Mish
+  resolution:
+    - 32
+    - 32
+  mhsa4: True
+  heads4: 8
+  cbam: True
 criterion:
   name: TradesLoss
   epsilon: 0.03137254901960784
@@ -17,16 +24,19 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 1024
-  eval_batch_size: 512
+  train_batch_size: 256
+  eval_batch_size: 256
   num_of_workers: 8
   dataset_type: CIFAR10
   data_path: /data/huangshihua/CIFAR10
 optimizer:
-  name: SGD
-  lr: 0.01
-  weight_decay: 0.0002
-  momentum: 0.9
+  name: Adam
+  lr: 0.0001
+#  weight_decay: 0.0002
+#  name: SGD
+#  lr: 0.01
+#  weight_decay: 0.0002
+#  momentum: 0.9
 scheduler:
   name: MultiStepLR
   milestones:

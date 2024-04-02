@@ -3,9 +3,9 @@ epochs: 100
 grad_clip: 5.0
 log_frequency: 10
 model:
-  name: ResNet
-  block: Bottleneck
-  num_blocks:
+  name: ResNet_cbam
+  block: Bottleneck_cbam
+  layers:
     - 3
     - 4
     - 6
@@ -23,10 +23,13 @@ dataset:
   dataset_type: CIFAR10
   data_path: /data/huangshihua/CIFAR10
 optimizer:
-  name: SGD
-  lr: 0.01
+  name: Adam
+  lr: 0.001
   weight_decay: 0.0002
-  momentum: 0.9
+#  name: SGD
+#  lr: 0.01
+#  weight_decay: 0.0002
+#  momentum: 0.9
 scheduler:
   name: MultiStepLR
   milestones:

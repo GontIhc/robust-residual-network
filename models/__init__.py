@@ -1,6 +1,9 @@
 import mlconfig
 import torch
-from models.resnet import PreActResNet, ResNet
+
+from models.FPN import FPN
+from models.resnet import PreActResNet
+from models.resnet_Attention import ResNet
 from models.resnet_cbam import ResNet_cbam, Bottleneck_cbam
 from models.robnet import RobNet
 from models.advrush import AdvRush
@@ -26,4 +29,5 @@ mlconfig.register(ResNet)  # 基本的ResNet
 mlconfig.register(Wide_ResNet)  # 基本的WideResNet
 
 mlconfig.register(ResNet_cbam)
+mlconfig.register(FPN)
 

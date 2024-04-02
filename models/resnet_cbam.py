@@ -99,7 +99,7 @@ class ResNet_cbam(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         # it is slightly better whereas slower to set stride = 1
         # self.layer4 = self._make_layer(block, 512, layers[3], stride=1)
         self.avgpool = nn.AvgPool2d(2)
@@ -132,7 +132,7 @@ class ResNet_cbam(nn.Module):
 
     def forward(self, x):
         out = self.relu(self.bn1(self.conv1(x)))
-        out = self.maxpool(out)
+        # out = self.maxpool(out)
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
