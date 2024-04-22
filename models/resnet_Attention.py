@@ -29,7 +29,10 @@ class BasicBlock(nn.Module):
         self.bn2 = avaliable_normalizations[normalization](planes)
 
         # 激活函数
-        self.activation = avaliable_activations[activation](inplace=True)
+        if activation == 'Swish':
+            self.activation = avaliable_activations[activation]()
+        else:
+            self.activation = avaliable_activations[activation](inplace=True)
 
         # SE模块
         self.se_switch = se_switch
@@ -44,9 +47,6 @@ class BasicBlock(nn.Module):
                 avaliable_normalizations[normalization](self.expansion * planes)
                 # nn.BatchNorm2d(self.expansion * planes)
             )
-
-
-
 
     def forward(self, x):
         out = self.activation(self.bn1(self.conv1(x)))
@@ -67,7 +67,7 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride=1, mhsa=False, heads=4, resolution=None,
                  activation='ReLU', normalization='BatchNorm',
-                 se_switch=False,  se_reduction=16,  # 是否使用SE模块
+                 se_switch=False, se_reduction=16,  # 是否使用SE模块
                  cbam=False,  # 是否使用cbam模块
                  D=False,  # 是否使用ResNet-D的下采样优化
                  ):
@@ -98,7 +98,10 @@ class Bottleneck(nn.Module):
         self.bn3 = avaliable_normalizations[normalization](self.expansion * planes)
 
         # 激活函数
-        self.activation = avaliable_activations[activation](inplace=True)
+        if activation == 'Swish':
+            self.activation = avaliable_activations[activation]()
+        else:
+            self.activation = avaliable_activations[activation](inplace=True)
 
         # SE模块
         self.se_switch = se_switch
@@ -112,9 +115,7 @@ class Bottleneck(nn.Module):
             self.ca = ChannelAttention_(planes * 4)
             self.sa = SpatialAttention_()
 
-
         self.shortcut = nn.Sequential()
-
 
         if stride != 1:
             if D:  # 启用了ResNet-D的优化,修改恒等链接
@@ -135,8 +136,6 @@ class Bottleneck(nn.Module):
                 avaliable_normalizations[normalization](self.expansion * planes)
                 # nn.BatchNorm2d(self.expansion * planes)
             )
-
-
 
     def forward(self, x):
         out = self.activation(self.bn1(self.conv1(x)))
@@ -196,7 +195,10 @@ class ResNet(nn.Module):
         self.linear = nn.Linear(512 * block.expansion, num_classes)
 
         # 激活函数
-        self.activation = avaliable_activations[activation](inplace=True)
+        if activation == 'Swish':
+            self.activation = avaliable_activations[activation]()
+        else:
+            self.activation = avaliable_activations[activation](inplace=True)
 
     def _make_layer(self, block, planes, num_blocks, stride, activation, normalization,
                     heads=4, mhsa=False, se_switch=False, se_reduction=16, cbam=False, D=False):
@@ -311,11 +313,9 @@ class SpatialAttention_(nn.Module):
         return self.sigmoid(x)
 
 
-
-
 if __name__ == '__main__':
-    model = ResNet(block='Bottleneck', num_blocks=[3, 4, 6, 3],  activation='Mish',
-                    mhsa4=True, resolution=[32, 32], heads4=8, D=True)
+    model = ResNet(block='Bottleneck', num_blocks=[3, 4, 6, 3], activation='Swish',
+                   mhsa4=True, resolution=[32, 32], heads4=8, D=True)
 
     x = torch.randn(1, 3, 32, 32)
     out = model(x)

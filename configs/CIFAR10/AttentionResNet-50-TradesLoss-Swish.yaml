@@ -10,6 +10,7 @@ model:
     - 4
     - 6
     - 3
+  activation: Swish
   mhsa4: True
   resolution:
     - 32
@@ -22,8 +23,8 @@ criterion:
   step_size: 0.00784313725490196
 dataset:
   name: DatasetGenerator
-  train_batch_size: 256
-  eval_batch_size: 512
+  train_batch_size: 512
+  eval_batch_size: 256
   num_of_workers: 8
   dataset_type: CIFAR10
   data_path: /data/huangshihua/CIFAR10
